@@ -3,6 +3,7 @@
   "short_name": "Precios",
   "description": "Buscá el precio de cada producto por su código, sin internet.",
   "lang": "es-AR",
+  "id": "/precios/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

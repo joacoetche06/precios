@@ -1,5 +1,5 @@
 // Subí este número cada vez que cambies index.html, para que el celular baje la versión nueva.
-const VERSION = 'precios-v1';
+const VERSION = 'precios-v2';
 const ARCHIVOS = [
   './',
   './index.html',

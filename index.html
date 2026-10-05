@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#b87366" />
+  <title>Precios</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <style>
+    :root {
+      --rosa: #b87366;
+      --rosa-profundo: #8a4a3f;
+      --rosa-claro: #f4d1d1;
+      --rosa-velo: #fbeeec;
+      --agua: #b5d8cc;
+      --tinta: #2c3e50;
+      --tinta-suave: #5d6d7e;
+      --linea: #e6dcda;
+      --fondo: #ffffff;
+      box-sizing: border-box;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: inherit; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--fondo);
+      color: var(--tinta);
+      -webkit-tap-highlight-color: transparent;
+    }
+    button { font: inherit; color: inherit; }
+    :focus-visible { outline: 3px solid var(--rosa); outline-offset: 2px; }
+
+    .app { max-width: 560px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; }
+    #conLista:not([hidden]) { flex: 1; display: flex; flex-direction: column; }
+
+    /* ---------- Buscador (fijo arriba) ---------- */
+    .buscador {
+      position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2;
+      background: var(--fondo);
+      padding: 16px 16px 10px;
+      border-bottom: 1px solid var(--linea);
+    }
+    .campo {
+      display: flex; align-items: center;
+      border: 3px solid var(--tinta);
+      border-radius: 14px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .campo:focus-within { border-color: var(--rosa); }
+    .prefijo-fijo {
+      font-size: 34px; font-weight: 700; letter-spacing: 0.02em;
+      padding: 0 2px 0 16px; color: var(--rosa-profundo);
+    }
+    .prefijo-fijo:empty { display: none; }
+    #q {
+      flex: 1; min-width: 0;
+      border: 0; outline: 0; background: transparent;
+      font-size: 34px; font-weight: 700; letter-spacing: 0.02em;
+      padding: 12px 14px; color: var(--tinta);
+      text-transform: uppercase;
+    }
+    #q::placeholder { color: #b9b1af; font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 24px; }
+    .borrar {
+      border: 0; background: none; font-size: 28px; line-height: 1;
+      padding: 10px 16px; color: var(--tinta-suave); cursor: pointer;
+    }
+    .borrar[hidden] { display: none; }
+
+    .prefijos {
+      display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0 4px;
+    }
+    .chip {
+      flex: 0 0 auto;
+      min-width: 56px; padding: 10px 14px;
+      border: 2px solid var(--linea); border-radius: 999px;
+      background: #fff; font-size: 18px; font-weight: 700; cursor: pointer;
+    }
+    .chip[aria-pressed="true"] { background: var(--rosa); border-color: var(--rosa); color: #fff; }
+
+    /* ---------- Resultado ---------- */
+    main { flex: 1; padding: 8px 16px 24px; }
+
+    .ficha {
+      margin: 18px 0 8px;
+      padding: 22px 20px 26px;
+      background: var(--rosa-velo);
+      border-radius: 20px;
+    }
+    .ficha-codigo { font-size: 22px; font-weight: 700; color: var(--rosa-profundo); }
+    .ficha-nombre { font-size: 18px; color: var(--tinta-suave); margin-top: 2px; }
+    .ficha-precio {
+      font-size: clamp(64px, 20vw, 108px);
+      font-weight: 800; line-height: 1.02;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums lining-nums;
+      margin-top: 14px;
+      color: var(--tinta);
+      word-break: break-all;
+    }
+    .ficha-precio .signo { font-size: 0.5em; vertical-align: 0.62em; margin-right: 0.06em; font-weight: 700; color: var(--rosa-profundo); }
+    .ficha.aparece { animation: aparece 160ms ease-out; }
+    @keyframes aparece { from { transform: scale(0.98); opacity: 0.4; } to { transform: none; opacity: 1; } }
+
+    .titulo-lista { font-size: 15px; color: var(--tinta-suave); margin: 22px 0 6px; font-weight: 500; }
+    .lista { list-style: none; margin: 0; padding: 0; }
+    .lista button {
+      width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 12px;
+      text-align: left; background: none; border: 0; border-bottom: 1px solid var(--linea);
+      padding: 14px 4px; cursor: pointer;
+    }
+    .lista .cod { font-weight: 700; font-size: 20px; }
+    .lista .nom { color: var(--tinta-suave); font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lista .pre { font-weight: 700; font-size: 20px; font-variant-numeric: tabular-nums; }
+
+    .mensaje { font-size: 20px; line-height: 1.45; margin: 28px 4px; }
+    .mensaje small { display: block; font-size: 16px; color: var(--tinta-suave); margin-top: 6px; }
+
+    /* ---------- Vacío (sin lista cargada) ---------- */
+    .vacio { padding: 40px 8px; }
+    .vacio h1 { font-size: 30px; line-height: 1.15; margin: 0 0 12px; }
+    .vacio p { font-size: 18px; line-height: 1.5; color: var(--tinta-suave); margin: 0 0 24px; }
+    .pasos { margin: 0 0 28px; padding-left: 22px; font-size: 18px; line-height: 1.5; }
+    .pasos li { margin-bottom: 8px; }
+
+    .btn {
+      display: block; width: 100%;
+      padding: 18px; border: 0; border-radius: 14px;
+      font-size: 20px; font-weight: 700; cursor: pointer;
+      background: var(--rosa); color: #fff;
+    }
+    .btn.sec { background: #fff; color: var(--tinta); border: 2px solid var(--linea); margin-top: 12px; }
+    .btn[hidden] { display: none; }
+
+    /* ---------- Pie ---------- */
+    footer {
+      border-top: 1px solid var(--linea);
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+      display: flex; align-items: center; gap: 10px;
+      font-size: 14px; color: var(--tinta-suave);
+    }
+    footer .info { flex: 1; line-height: 1.35; }
+    footer .info strong { color: var(--tinta); }
+    footer button {
+      border: 2px solid var(--linea); background: #fff; border-radius: 10px;
+      padding: 8px 12px; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+
+    .aviso {
+      position: fixed; left: 16px; right: 16px; bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+      max-width: 528px; margin: 0 auto;
+      background: var(--tinta); color: #fff; padding: 14px 16px; border-radius: 12px;
+      font-size: 16px; z-index: 5;
+    }
+    .aviso.error { background: #9b2c2c; }
+    .aviso[hidden] { display: none; }
+
+    .oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+    @media (prefers-reduced-motion: reduce) { .ficha.aparece { animation: none; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Con lista cargada -->
+    <div id="conLista" hidden>
+      <div class="buscador">
+        <label for="q" class="oculto">Código del producto</label>
+        <div class="campo">
+          <span class="prefijo-fijo" id="prefijoFijo"></span>
+          <input id="q" type="text" inputmode="text" autocomplete="off" autocorrect="off"
+                 autocapitalize="characters" spellcheck="false" enterkeyhint="search"
+                 placeholder="Código o nombre" />
+          <button class="borrar" id="borrar" type="button" aria-label="Borrar" hidden>✕</button>
+        </div>
+        <div class="prefijos" id="prefijos" role="group" aria-label="Categorías"></div>
+      </div>
+
+      <main id="resultado" aria-live="polite"></main>
+
+      <footer>
+        <div class="info" id="infoLista"></div>
+        <button type="button" id="btnCambiar">Cambiar lista</button>
+      </footer>
+    </div>
+
+    <!-- Sin lista -->
+    <div id="sinLista" class="vacio" hidden>
+      <h1>Cargá la lista de precios</h1>
+      <p>Se carga una sola vez. Después funciona sin internet.</p>
+      <ol class="pasos">
+        <li>En el programa de la compu, entrá a <strong>Lista de precios</strong> y tocá <strong>Exportar para el celular</strong>.</li>
+        <li>Mandate el archivo por WhatsApp.</li>
+        <li>Tocá <strong>Cargar lista</strong> y elegilo.</li>
+      </ol>
+      <button class="btn" id="btnCargar" type="button">Cargar lista</button>
+      <button class="btn sec" id="btnInstalar" type="button" hidden>Instalar en el celular</button>
+    </div>
+  </div>
+
+  <input type="file" id="archivo" class="oculto" />
+  <div class="aviso" id="aviso" role="status" hidden></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const CLAVE = 'lista-precios-v1';
+  const CACHE_COMPARTIDO = 'compartido';
+  const URL_COMPARTIDO = './__lista-compartida';
+
+  const $ = (id) => document.getElementById(id);
+  const el = {
+    conLista: $('conLista'), sinLista: $('sinLista'),
+    q: $('q'), prefijoFijo: $('prefijoFijo'), borrar: $('borrar'), prefijos: $('prefijos'),
+    resultado: $('resultado'), infoLista: $('infoLista'),
+    btnCambiar: $('btnCambiar'), btnCargar: $('btnCargar'), btnInstalar: $('btnInstalar'),
+    archivo: $('archivo'), aviso: $('aviso'),
+  };
+
+  let lista = null;        // { negocio, origen, generada, productos: [...] }
+  let indice = [];         // productos con claves de búsqueda precalculadas
+  let prefijo = '';        // categoría elegida con los chips
+  let fijado = null;       // producto tocado en la lista de coincidencias
+
+  // ---------- Normalización ----------
+  const sinAcentos = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const limpio = (s) => sinAcentos(String(s || '')).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  // "PU05" y "PU5" son el mismo código
+  const clave = (s) => {
+    const m = limpio(s).match(/^([A-Z]*)(\d+)$/);
+    return m ? m[1] + String(parseInt(m[2], 10)) : limpio(s);
+  };
+  const precioTexto = (n) => Math.round(Number(n) || 0).toLocaleString('es-AR');
+  const fechaTexto = (iso) => {
+    const d = new Date(iso);
+    return isNaN(d) ? '' : d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+  };
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // ---------- Persistencia ----------
+  function guardar(datos) {
+    try { localStorage.setItem(CLAVE, JSON.stringify(datos)); return true; }
+    catch { return false; }
+  }
+  function leer() {
+    try { const t = localStorage.getItem(CLAVE); return t ? JSON.parse(t) : null; }
+    catch { return null; }
+  }
+
+  function validar(datos) {
+    if (!datos || datos.tipo !== 'lista-precios' || !Array.isArray(datos.productos)) {
+      throw new Error('Ese archivo no es una lista de precios. Exportala de nuevo desde el programa.');
+    }
+    if (!datos.productos.length) throw new Error('La lista no tiene productos.');
+    return datos;
+  }
+
+  function usarLista(datos) {
+    lista = datos;
+    indice = datos.productos.map((p) => ({
+      codigo: String(p.c), nombre: p.n || '', categoria: p.cat || '', precio: Number(p.p) || 0,
+      kClave: clave(p.c), kLimpio: limpio(p.c), kNombre: limpio(p.n),
+      pref: (limpio(p.c).match(/^[A-Z]+/) || [''])[0],
+    }));
+    prefijo = ''; fijado = null; el.q.value = '';
+    pintarPrefijos();
+    pintarInfo();
+    el.sinLista.hidden = true;
+    el.conLista.hidden = false;
+    actualizarCampo();
+    buscar();
+  }
+
+  async function importarTexto(texto, origenTexto) {
+    let datos;
+    try { datos = validar(JSON.parse(texto)); }
+    catch (e) { avisar(e instanceof SyntaxError ? 'No se pudo leer el archivo. Exportalo de nuevo desde el programa.' : e.message, true); return false; }
+    if (!guardar(datos)) { avisar('No se pudo guardar la lista en el celular. Liberá espacio y probá de nuevo.', true); return false; }
+    try { await navigator.storage?.persist?.(); } catch {}
+    usarLista(datos);
+    avisar(`Lista cargada${origenTexto ? ' ' + origenTexto : ''}: ${datos.productos.length} productos.`);
+    return true;
+  }
+
+  // ---------- Pintado ----------
+  function pintarPrefijos() {
+    const usados = [...new Set(indice.map((p) => p.pref).filter(Boolean))].sort();
+    el.prefijos.innerHTML = usados.map((p) =>
+      `<button type="button" class="chip" data-pref="${esc(p)}" aria-pressed="false">${esc(p)}</button>`
+    ).join('');
+  }
+
+  function pintarInfo() {
+    const partes = [`<strong>${lista.productos.length} productos</strong>`];
+    if (lista.generada) partes.push(`lista del ${fechaTexto(lista.generada)}`);
+    el.infoLista.innerHTML = partes.join(', ') + (lista.origen ? `<br>${esc(lista.origen)}` : '');
+  }
+
+  function actualizarCampo() {
+    el.prefijoFijo.textContent = prefijo;
+    el.q.setAttribute('inputmode', prefijo ? 'numeric' : 'text');
+    el.q.placeholder = prefijo ? 'Número' : 'Código o nombre';
+    el.borrar.hidden = !(el.q.value || prefijo);
+    el.prefijos.querySelectorAll('.chip').forEach((b) =>
+      b.setAttribute('aria-pressed', String(b.dataset.pref === prefijo)));
+  }
+
+  function ficha(p) {
+    return `<section class="ficha aparece">
+      <div class="ficha-codigo">${esc(p.codigo)}</div>
+      ${p.nombre ? `<div class="ficha-nombre">${esc(p.nombre)}</div>` : ''}
+      <div class="ficha-precio"><span class="signo">$</span>${precioTexto(p.precio)}</div>
+    </section>`;
+  }
+
+  function filas(items) {
+    return `<ul class="lista">${items.map((p) =>
+      `<li><button type="button" data-codigo="${esc(p.codigo)}">
+        <span class="cod">${esc(p.codigo)}</span>
+        <span class="nom">${esc(p.nombre)}</span>
+        <span class="pre">$ ${precioTexto(p.precio)}</span>
+      </button></li>`).join('')}</ul>`;
+  }
+
+  function buscar() {
+    const texto = el.q.value;
+    const consulta = limpio(prefijo + texto);
+    const out = el.resultado;
+
+    if (fijado) { out.innerHTML = ficha(fijado); return; }
+
+    if (!consulta) {
+      out.innerHTML = `<p class="mensaje">Escribí el código que está en la etiqueta.<small>Tocá una categoría para escribir solo el número.</small></p>`;
+      return;
+    }
+
+    const kc = clave(consulta);
+    const exactos = indice.filter((p) => p.kClave === kc);
+    const empiezan = indice
+      .filter((p) => p.kClave !== kc && (p.kLimpio.startsWith(consulta) || p.kClave.startsWith(kc)))
+      .slice(0, 40);
+
+    // Solo letras y sin prefijo elegido: buscar también por nombre
+    let porNombre = [];
+    if (!prefijo && !exactos.length && !empiezan.length && consulta.length >= 3 && /[A-Z]/.test(consulta)) {
+      porNombre = indice.filter((p) => p.kNombre.includes(consulta)).slice(0, 40);
+    }
+
+    let html = '';
+    if (exactos.length === 1) html += ficha(exactos[0]);
+    else if (exactos.length > 1) html += filas(exactos);
+
+    if (empiezan.length) {
+      html += `<p class="titulo-lista">${exactos.length ? 'Otros códigos parecidos' : 'Seguí escribiendo o tocá uno'}</p>` + filas(empiezan);
+    } else if (porNombre.length) {
+      html += `<p class="titulo-lista">Por nombre</p>` + filas(porNombre);
+    }
+
+    if (!html) {
+      html = `<p class="mensaje">${esc(consulta)} no está en esta lista.<small>Revisá el código o fijate si la lista está actualizada.</small></p>`;
+    }
+    out.innerHTML = html;
+  }
+
+  // ---------- Eventos ----------
+  el.q.addEventListener('input', () => { fijado = null; actualizarCampo(); buscar(); });
+
+  el.borrar.addEventListener('click', () => {
+    el.q.value = ''; prefijo = ''; fijado = null;
+    actualizarCampo(); buscar(); el.q.focus();
+  });
+
+  el.prefijos.addEventListener('click', (e) => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    prefijo = prefijo === b.dataset.pref ? '' : b.dataset.pref;
+    // Si había escrito letras, quedarse solo con los números
+    el.q.value = prefijo ? el.q.value.replace(/\D/g, '') : el.q.value;
+    fijado = null;
+    actualizarCampo(); buscar();
+    // Re-enfocar para que Android cambie al teclado numérico
+    el.q.blur(); el.q.focus();
+  });
+
+  el.resultado.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-codigo]'); if (!b) return;
+    fijado = indice.find((p) => p.codigo === b.dataset.codigo) || null;
+    buscar();
+    window.scrollTo({ top: 0 });
+  });
+
+  el.btnCargar.addEventListener('click', () => el.archivo.click());
+  el.btnCambiar.addEventListener('click', () => el.archivo.click());
+
+  el.archivo.addEventListener('change', async () => {
+    const f = el.archivo.files && el.archivo.files[0];
+    el.archivo.value = '';
+    if (!f) return;
+    importarTexto(await f.text());
+  });
+
+  let avisoTimer;
+  function avisar(texto, esError = false) {
+    el.aviso.textContent = texto;
+    el.aviso.classList.toggle('error', esError);
+    el.aviso.hidden = false;
+    clearTimeout(avisoTimer);
+    avisoTimer = setTimeout(() => { el.aviso.hidden = true; }, esError ? 6000 : 3500);
+  }
+
+  // ---------- Instalación ----------
+  let promptInstalar = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault(); promptInstalar = e; el.btnInstalar.hidden = false;
+  });
+  el.btnInstalar.addEventListener('click', async () => {
+    if (!promptInstalar) return;
+    promptInstalar.prompt();
+    await promptInstalar.userChoice.catch(() => null);
+    promptInstalar = null; el.btnInstalar.hidden = true;
+  });
+  window.addEventListener('appinstalled', () => { el.btnInstalar.hidden = true; });
+
+  // ---------- Arranque ----------
+  async function arrancar() {
+    if ('serviceWorker' in navigator) {
+      try { await navigator.serviceWorker.register('./sw.js'); } catch {}
+    }
+
+    // Archivo recibido con "Compartir" desde WhatsApp (share_target)
+    let compartido = false;
+    if ('caches' in window) {
+      try {
+        const cache = await caches.open(CACHE_COMPARTIDO);
+        const resp = await cache.match(URL_COMPARTIDO);
+        if (resp) {
+          const texto = await resp.text();
+          await cache.delete(URL_COMPARTIDO);
+          compartido = await importarTexto(texto, 'desde WhatsApp');
+        }
+      } catch {}
+      if (location.search) history.replaceState(null, '', location.pathname);
+    }
+
+    if (!compartido) {
+      const guardada = leer();
+      if (guardada) { try { usarLista(validar(guardada)); } catch { el.sinLista.hidden = false; } }
+      else el.sinLista.hidden = false;
+    }
+  }
+
+  arrancar();
+})();
+</script>
+</body>
+</html>

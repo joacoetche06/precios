@@ -1,5 +1,5 @@
 // Subí este número cada vez que cambies index.html, para que el celular baje la versión nueva.
-const VERSION = 'precios-v2';
+const VERSION = 'precios-v3';
 const ARCHIVOS = [
   './',
   './index.html',
@@ -34,11 +34,20 @@ self.addEventListener('fetch', (e) => {
       try {
         const form = await e.request.formData();
         const archivo = form.get('lista');
+        const cache = await caches.open(CACHE_COMPARTIDO);
         if (archivo && typeof archivo.text === 'function') {
-          const cache = await caches.open(CACHE_COMPARTIDO);
           await cache.put(URL_COMPARTIDO, new Response(await archivo.text(), {
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Nombre': encodeURIComponent(archivo.name || ''),
+              'X-Tipo': archivo.type || '',
+              'X-Tamano': String(archivo.size ?? ''),
+            },
           }));
+        } else {
+          // Para diagnosticar: qué mandó la app que compartió
+          const campos = [...form.keys()].join(',') || 'ninguno';
+          await cache.put(URL_COMPARTIDO, new Response('', { headers: { 'X-Sin-Archivo': campos } }));
         }
       } catch (err) {
         // Si falla, la app abre igual con la lista anterior

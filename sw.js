@@ -1,5 +1,5 @@
 // Subí este número cada vez que cambies index.html, para que el celular baje la versión nueva.
-const VERSION = 'precios-v3';
+const VERSION = 'precios-v4';
 const ARCHIVOS = [
   './',
   './index.html',
@@ -43,6 +43,12 @@ self.addEventListener('fetch', (e) => {
               'X-Tipo': archivo.type || '',
               'X-Tamano': String(archivo.size ?? ''),
             },
+          }));
+        } else if (form.get('text') || form.get('url')) {
+          // Mensaje de texto compartido (por ejemplo, el link de WhatsApp)
+          const texto = [form.get('title'), form.get('text'), form.get('url')].filter(Boolean).join('\n');
+          await cache.put(URL_COMPARTIDO, new Response(texto, {
+            headers: { 'X-Nombre': 'texto', 'X-Tipo': 'text/plain', 'X-Tamano': String(texto.length) },
           }));
         } else {
           // Para diagnosticar: qué mandó la app que compartió

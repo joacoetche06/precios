@@ -147,6 +147,7 @@
     footer .info { flex: 1; line-height: 1.35; }
     footer .info strong { color: var(--tinta); }
     footer button {
+      flex: 0 0 auto;
       border: 2px solid var(--linea); background: #fff; border-radius: 10px;
       padding: 8px 12px; font-size: 14px; font-weight: 600; cursor: pointer;
     }
@@ -185,7 +186,8 @@
 
       <footer>
         <div class="info" id="infoLista"></div>
-        <button type="button" id="btnCambiar">Cambiar lista</button>
+        <button type="button" id="btnPegar2">Pegar link</button>
+        <button type="button" id="btnCambiar">Archivo</button>
       </footer>
     </div>
 
@@ -195,9 +197,11 @@
       <p>Se carga una sola vez. Después funciona sin internet.</p>
       <ol class="pasos">
         <li>En el programa de la compu, entrá a <strong>Precios</strong> y tocá <strong>Copiar link para el celular</strong>.</li>
-        <li>Pegá el link en WhatsApp y mandátelo.</li>
-        <li>Tocá el link desde el celular. La lista queda cargada acá.</li>
+        <li>Pegalo en WhatsApp y mandátelo.</li>
+        <li>En el celular, mantené apretado ese mensaje y tocá <strong>Copiar</strong>.</li>
+        <li>Volvé acá y tocá <strong>Pegar link</strong>.</li>
       </ol>
+      <button class="btn" id="btnPegar" type="button">Pegar link</button>
       <button class="btn sec" id="btnCargar" type="button">Tengo el archivo: cargar lista</button>
       <button class="btn sec" id="btnInstalar" type="button" hidden>Instalar en el celular</button>
     </div>
@@ -220,6 +224,7 @@
     q: $('q'), prefijoFijo: $('prefijoFijo'), borrar: $('borrar'), prefijos: $('prefijos'),
     resultado: $('resultado'), infoLista: $('infoLista'),
     btnCambiar: $('btnCambiar'), btnCargar: $('btnCargar'), btnInstalar: $('btnInstalar'),
+    btnPegar: $('btnPegar'), btnPegar2: $('btnPegar2'),
     archivo: $('archivo'), aviso: $('aviso'),
   };
 
@@ -300,14 +305,31 @@
     return new Response(stream).text();
   }
 
-  async function importarDesdeHash() {
-    const m = location.hash.match(/^#l=([A-Za-z0-9_-]+)/);
-    if (!m) return false;
-    history.replaceState(null, '', location.pathname);
-    let texto;
-    try { texto = await descomprimir(m[1]); }
+  // Acepta el link (o un mensaje que lo contenga) o el JSON del archivo
+  async function importarCualquiera(texto, origenTexto, detalle) {
+    const m = String(texto || '').match(/#l=([A-Za-z0-9_-]+)/);
+    if (!m) return importarTexto(texto, origenTexto, detalle);
+    let json;
+    try { json = await descomprimir(m[1]); }
     catch { avisar('El link está incompleto. Copialo de nuevo desde el programa y mandalo entero.', true); return false; }
-    return importarTexto(texto, 'desde el link');
+    return importarTexto(json, origenTexto);
+  }
+
+  async function importarDesdeHash() {
+    const hash = location.hash;
+    if (!hash.startsWith('#l=')) return false;
+    history.replaceState(null, '', location.pathname);
+    return importarCualquiera(hash, 'desde el link');
+  }
+
+  async function pegar() {
+    let texto = '';
+    try { texto = await navigator.clipboard.readText(); } catch {}
+    if (!/#l=/.test(texto)) {
+      texto = prompt('Mantené apretado acá adentro, tocá Pegar y después Aceptar.') || '';
+    }
+    if (!texto.trim()) return;
+    importarCualquiera(texto.trim(), 'desde el link');
   }
 
   // ---------- Pintado ----------
@@ -417,13 +439,15 @@
   });
 
   el.btnCargar.addEventListener('click', () => el.archivo.click());
+  el.btnPegar.addEventListener('click', pegar);
+  el.btnPegar2.addEventListener('click', pegar);
   el.btnCambiar.addEventListener('click', () => el.archivo.click());
 
   el.archivo.addEventListener('change', async () => {
     const f = el.archivo.files && el.archivo.files[0];
     el.archivo.value = '';
     if (!f) return;
-    importarTexto(await f.text());
+    importarCualquiera(await f.text());
   });
 
   let avisoTimer;
@@ -468,7 +492,8 @@
           const detalle = h('X-Sin-Archivo')
             ? `no llegó ningún archivo; campos: ${h('X-Sin-Archivo')}`
             : `llegó "${decodeURIComponent(h('X-Nombre'))}", ${h('X-Tipo') || 'sin tipo'}, ${h('X-Tamano')} bytes`;
-          importada = await importarTexto(texto, 'desde WhatsApp', detalle);
+          const muestra = texto.slice(0, 30).replace(/\s+/g, ' ');
+          importada = await importarCualquiera(texto, 'desde WhatsApp', detalle + (muestra ? `, empieza con "${muestra}"` : ''));
         }
       } catch {}
     }

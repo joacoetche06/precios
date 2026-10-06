@@ -1,5 +1,5 @@
-// Subí este número cada vez que cambies index.html, para que el celular baje la versión nueva.
-const VERSION = 'precios-v4';
+// Subí este número cada vez que cambies algún archivo, para que el celular baje la versión nueva.
+const VERSION = 'precios-v5';
 const ARCHIVOS = [
   './',
   './index.html',
@@ -8,76 +8,41 @@ const ARCHIVOS = [
   './icon-512.png',
   './icon-maskable-512.png',
 ];
-const CACHE_COMPARTIDO = 'compartido';
-const URL_COMPARTIDO = './__lista-compartida';
+const OPCIONALES = ['./logo.png'];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(ARCHIVOS)).then(() => self.skipWaiting()));
+  e.waitUntil((async () => {
+    const cache = await caches.open(VERSION);
+    await cache.addAll(ARCHIVOS);
+    // Si falta el logo, la app se instala igual
+    await Promise.all(OPCIONALES.map((u) => cache.add(u).catch(() => {})));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((claves) => Promise.all(
-        claves.filter((k) => k !== VERSION && k !== CACHE_COMPARTIDO).map((k) => caches.delete(k)),
-      ))
+      .then((claves) => Promise.all(claves.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
 
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
-
-  // "Compartir" desde WhatsApp → guardamos el archivo y abrimos la app
-  if (e.request.method === 'POST' && url.pathname.endsWith('/compartir')) {
-    e.respondWith((async () => {
-      try {
-        const form = await e.request.formData();
-        const archivo = form.get('lista');
-        const cache = await caches.open(CACHE_COMPARTIDO);
-        if (archivo && typeof archivo.text === 'function') {
-          await cache.put(URL_COMPARTIDO, new Response(await archivo.text(), {
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Nombre': encodeURIComponent(archivo.name || ''),
-              'X-Tipo': archivo.type || '',
-              'X-Tamano': String(archivo.size ?? ''),
-            },
-          }));
-        } else if (form.get('text') || form.get('url')) {
-          // Mensaje de texto compartido (por ejemplo, el link de WhatsApp)
-          const texto = [form.get('title'), form.get('text'), form.get('url')].filter(Boolean).join('\n');
-          await cache.put(URL_COMPARTIDO, new Response(texto, {
-            headers: { 'X-Nombre': 'texto', 'X-Tipo': 'text/plain', 'X-Tamano': String(texto.length) },
-          }));
-        } else {
-          // Para diagnosticar: qué mandó la app que compartió
-          const campos = [...form.keys()].join(',') || 'ninguno';
-          await cache.put(URL_COMPARTIDO, new Response('', { headers: { 'X-Sin-Archivo': campos } }));
-        }
-      } catch (err) {
-        // Si falla, la app abre igual con la lista anterior
-      }
-      return Response.redirect('./?compartido=1', 303);
-    })());
-    return;
-  }
-
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
 
   // Páginas: la versión guardada, así abre al instante y sin internet
   if (e.request.mode === 'navigate') {
-    e.respondWith(
-      caches.match('./index.html').then((r) => r || fetch(e.request)),
-    );
+    e.respondWith(caches.match('./index.html').then((r) => r || fetch(e.request)));
     // De fondo, si hay internet, actualizamos la copia
     e.waitUntil(
-      fetch('./index.html').then((r) => r.ok && caches.open(VERSION).then((c) => c.put('./index.html', r))).catch(() => {}),
+      fetch('./index.html')
+        .then((r) => r.ok && caches.open(VERSION).then((c) => c.put('./index.html', r)))
+        .catch(() => {}),
     );
     return;
   }
 
-  e.respondWith(
-    caches.match(e.request).then((r) => r || fetch(e.request)),
-  );
+  e.respondWith(caches.match(e.request).then((r) => r || fetch(e.request)));
 });

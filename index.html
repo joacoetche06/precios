@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#b87366" />
-  <title>Precios</title>
+  <title>Precios - Chicas de Buenos Aires</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icon-192.png" />
   <link rel="apple-touch-icon" href="icon-192.png" />
@@ -122,7 +122,8 @@
     .mensaje small { display: block; font-size: 16px; color: var(--tinta-suave); margin-top: 6px; }
 
     /* ---------- Vacío (sin lista cargada) ---------- */
-    .vacio { padding: 40px 8px; }
+    .vacio { padding: 32px 8px; }
+    .logo-grande { display: block; width: 132px; height: 132px; object-fit: contain; border-radius: 24px; margin: 0 0 28px; }
     .vacio h1 { font-size: 30px; line-height: 1.15; margin: 0 0 12px; }
     .vacio p { font-size: 18px; line-height: 1.5; color: var(--tinta-suave); margin: 0 0 24px; }
     .pasos { margin: 0 0 28px; padding-left: 22px; font-size: 18px; line-height: 1.5; }
@@ -145,6 +146,7 @@
       font-size: 14px; color: var(--tinta-suave);
     }
     footer .info { flex: 1; line-height: 1.35; }
+    footer .logo-chico { width: 40px; height: 40px; border-radius: 10px; object-fit: contain; flex: 0 0 auto; }
     footer .info strong { color: var(--tinta); }
     footer button {
       flex: 0 0 auto;
@@ -176,7 +178,7 @@
           <span class="prefijo-fijo" id="prefijoFijo"></span>
           <input id="q" type="text" inputmode="text" autocomplete="off" autocorrect="off"
                  autocapitalize="characters" spellcheck="false" enterkeyhint="search"
-                 placeholder="Código o nombre" />
+                 placeholder="Código" />
           <button class="borrar" id="borrar" type="button" aria-label="Borrar" hidden>✕</button>
         </div>
         <div class="prefijos" id="prefijos" role="group" aria-label="Categorías"></div>
@@ -185,29 +187,27 @@
       <main id="resultado" aria-live="polite"></main>
 
       <footer>
+        <img class="logo-chico" src="logo.png" alt="" onerror="this.remove()" />
         <div class="info" id="infoLista"></div>
         <button type="button" id="btnPegar2">Pegar link</button>
-        <button type="button" id="btnCambiar">Archivo</button>
       </footer>
     </div>
 
     <!-- Sin lista -->
     <div id="sinLista" class="vacio" hidden>
+      <img class="logo-grande" src="logo.png" alt="Chicas de Buenos Aires" onerror="this.remove()" />
       <h1>Cargá la lista de precios</h1>
       <p>Se carga una sola vez. Después funciona sin internet.</p>
       <ol class="pasos">
-        <li>En el programa de la compu, entrá a <strong>Precios</strong> y tocá <strong>Copiar link para el celular</strong>.</li>
-        <li>Pegalo en WhatsApp y mandátelo.</li>
-        <li>En el celular, mantené apretado ese mensaje y tocá <strong>Copiar</strong>.</li>
-        <li>Volvé acá y tocá <strong>Pegar link</strong>.</li>
+        <li>En el programa de la compu, entrá a <strong>Precios</strong> y tocá <strong>Pasar al celular</strong>.</li>
+        <li>Apuntá la cámara del celular al código QR que aparece y tocá el link.</li>
       </ol>
+      <p>¿Te mandaste el link por WhatsApp? Mantené apretado el mensaje, tocá <strong>Copiar</strong> y después:</p>
       <button class="btn" id="btnPegar" type="button">Pegar link</button>
-      <button class="btn sec" id="btnCargar" type="button">Tengo el archivo: cargar lista</button>
       <button class="btn sec" id="btnInstalar" type="button" hidden>Instalar en el celular</button>
     </div>
   </div>
 
-  <input type="file" id="archivo" class="oculto" />
   <div class="aviso" id="aviso" role="status" hidden></div>
 
 <script>
@@ -215,21 +215,19 @@
   'use strict';
 
   const CLAVE = 'lista-precios-v1';
-  const CACHE_COMPARTIDO = 'compartido';
-  const URL_COMPARTIDO = './__lista-compartida';
 
   const $ = (id) => document.getElementById(id);
   const el = {
     conLista: $('conLista'), sinLista: $('sinLista'),
     q: $('q'), prefijoFijo: $('prefijoFijo'), borrar: $('borrar'), prefijos: $('prefijos'),
     resultado: $('resultado'), infoLista: $('infoLista'),
-    btnCambiar: $('btnCambiar'), btnCargar: $('btnCargar'), btnInstalar: $('btnInstalar'),
-    btnPegar: $('btnPegar'), btnPegar2: $('btnPegar2'),
-    archivo: $('archivo'), aviso: $('aviso'),
+    btnPegar: $('btnPegar'), btnPegar2: $('btnPegar2'), btnInstalar: $('btnInstalar'),
+    aviso: $('aviso'),
   };
 
-  let lista = null;        // { negocio, origen, generada, productos: [...] }
+  let lista = null;        // { tipo, negocio, origen, generada, productos: [{ c, n, p }] }
   let indice = [];         // productos con claves de búsqueda precalculadas
+  let conNombres = false;
   let prefijo = '';        // categoría elegida con los chips
   let fijado = null;       // producto tocado en la lista de coincidencias
 
@@ -257,22 +255,90 @@
     try { const t = localStorage.getItem(CLAVE); return t ? JSON.parse(t) : null; }
     catch { return null; }
   }
-
-  function validar(datos) {
-    if (!datos || datos.tipo !== 'lista-precios' || !Array.isArray(datos.productos)) {
-      throw new Error('Ese archivo no es una lista de precios. Exportala de nuevo desde el programa.');
-    }
-    if (!datos.productos.length) throw new Error('La lista no tiene productos.');
-    return datos;
+  function valida(datos) {
+    return !!(datos && datos.tipo === 'lista-precios' && Array.isArray(datos.productos) && datos.productos.length);
   }
 
+  // ---------- Lectura del link ----------
+  async function descomprimir(b64) {
+    const bin = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Response(stream).text();
+  }
+
+  // Formato corto (v2): "2|AAAAMMDD|origen|negocio" y una línea por producto.
+  // "AN01 12000" / "02 12000" (mismo prefijo que la anterior) / "=X-9 5000" (código literal),
+  // opcionalmente seguido de " nombre".
+  function leerV2(texto) {
+    const lineas = texto.split('\n');
+    const [ver, fecha, origen, negocio] = lineas[0].split('|');
+    if (ver !== '2') throw new Error('formato');
+    const f = /^(\d{4})(\d{2})(\d{2})$/.exec(fecha || '');
+    const generada = f ? new Date(+f[1], +f[2] - 1, +f[3], 12).toISOString() : '';
+
+    const productos = [];
+    let pref = '';
+    for (const linea of lineas.slice(1)) {
+      const m = /^(?:=(\S+)|([A-Z]*)(\d+)) (\d+)(?: (.*))?$/.exec(linea);
+      if (!m) continue;
+      let codigo;
+      if (m[1]) { codigo = m[1]; pref = ''; }
+      else { if (m[2]) pref = m[2]; codigo = pref + m[3]; }
+      productos.push({ c: codigo, n: m[5] || '', p: Number(m[4]) });
+    }
+    return { tipo: 'lista-precios', version: 2, negocio: negocio || '', origen: origen || '', generada, productos };
+  }
+
+  async function datosDesdeTexto(texto) {
+    const m = /#([lp])=([A-Za-z0-9_-]+)/.exec(String(texto || ''));
+    if (!m) throw new Error('No encontré ningún link de lista. Copiá el mensaje completo de WhatsApp.');
+    let crudo;
+    try { crudo = await descomprimir(m[2]); }
+    catch { throw new Error('El link está incompleto. Generalo de nuevo en el programa y copialo entero.'); }
+    try { return m[1] === 'p' ? leerV2(crudo) : JSON.parse(crudo); }
+    catch { throw new Error('El link no es válido. Generalo de nuevo en el programa.'); }
+  }
+
+  async function importar(texto) {
+    let datos;
+    try {
+      datos = await datosDesdeTexto(texto);
+      if (!valida(datos)) throw new Error('La lista llegó vacía. Generala de nuevo en el programa.');
+    } catch (e) { avisar(e.message, true); return false; }
+
+    if (!guardar(datos)) { avisar('No se pudo guardar la lista en el celular. Liberá espacio y probá de nuevo.', true); return false; }
+    try { await navigator.storage?.persist?.(); } catch {}
+    usarLista(datos);
+    avisar(`Lista cargada: ${datos.productos.length} productos.`);
+    return true;
+  }
+
+  async function importarDesdeHash() {
+    const hash = location.hash;
+    if (!/^#[lp]=/.test(hash)) return false;
+    history.replaceState(null, '', location.pathname);
+    return importar(hash);
+  }
+
+  async function pegar() {
+    let texto = '';
+    try { texto = await navigator.clipboard.readText(); } catch {}
+    if (!/#[lp]=/.test(texto)) {
+      texto = prompt('Mantené apretado acá adentro, tocá Pegar y después Aceptar.') || '';
+    }
+    if (texto.trim()) importar(texto.trim());
+  }
+
+  // ---------- Lista en uso ----------
   function usarLista(datos) {
     lista = datos;
     indice = datos.productos.map((p) => ({
-      codigo: String(p.c), nombre: p.n || '', categoria: p.cat || '', precio: Number(p.p) || 0,
+      codigo: String(p.c), nombre: p.n || '', precio: Number(p.p) || 0,
       kClave: clave(p.c), kLimpio: limpio(p.c), kNombre: limpio(p.n),
       pref: (limpio(p.c).match(/^[A-Z]+/) || [''])[0],
     }));
+    conNombres = indice.some((p) => p.nombre);
     prefijo = ''; fijado = null; el.q.value = '';
     pintarPrefijos();
     pintarInfo();
@@ -282,57 +348,6 @@
     buscar();
   }
 
-  async function importarTexto(texto, origenTexto, detalle) {
-    let datos;
-    try { datos = validar(JSON.parse(texto)); }
-    catch (e) {
-      const msg = e instanceof SyntaxError ? 'No se pudo leer la lista. Exportala de nuevo desde el programa.' : e.message;
-      avisar(msg + (detalle ? ` (${detalle})` : ''), true);
-      return false;
-    }
-    if (!guardar(datos)) { avisar('No se pudo guardar la lista en el celular. Liberá espacio y probá de nuevo.', true); return false; }
-    try { await navigator.storage?.persist?.(); } catch {}
-    usarLista(datos);
-    avisar(`Lista cargada${origenTexto ? ' ' + origenTexto : ''}: ${datos.productos.length} productos.`);
-    return true;
-  }
-
-  // Link con la lista en el #hash: #l=<deflate-raw en base64url>
-  async function descomprimir(b64) {
-    const bin = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
-    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
-    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-    return new Response(stream).text();
-  }
-
-  // Acepta el link (o un mensaje que lo contenga) o el JSON del archivo
-  async function importarCualquiera(texto, origenTexto, detalle) {
-    const m = String(texto || '').match(/#l=([A-Za-z0-9_-]+)/);
-    if (!m) return importarTexto(texto, origenTexto, detalle);
-    let json;
-    try { json = await descomprimir(m[1]); }
-    catch { avisar('El link está incompleto. Copialo de nuevo desde el programa y mandalo entero.', true); return false; }
-    return importarTexto(json, origenTexto);
-  }
-
-  async function importarDesdeHash() {
-    const hash = location.hash;
-    if (!hash.startsWith('#l=')) return false;
-    history.replaceState(null, '', location.pathname);
-    return importarCualquiera(hash, 'desde el link');
-  }
-
-  async function pegar() {
-    let texto = '';
-    try { texto = await navigator.clipboard.readText(); } catch {}
-    if (!/#l=/.test(texto)) {
-      texto = prompt('Mantené apretado acá adentro, tocá Pegar y después Aceptar.') || '';
-    }
-    if (!texto.trim()) return;
-    importarCualquiera(texto.trim(), 'desde el link');
-  }
-
-  // ---------- Pintado ----------
   function pintarPrefijos() {
     const usados = [...new Set(indice.map((p) => p.pref).filter(Boolean))].sort();
     el.prefijos.innerHTML = usados.map((p) =>
@@ -349,7 +364,7 @@
   function actualizarCampo() {
     el.prefijoFijo.textContent = prefijo;
     el.q.setAttribute('inputmode', prefijo ? 'numeric' : 'text');
-    el.q.placeholder = prefijo ? 'Número' : 'Código o nombre';
+    el.q.placeholder = prefijo ? 'Número' : (conNombres ? 'Código o nombre' : 'Código');
     el.borrar.hidden = !(el.q.value || prefijo);
     el.prefijos.querySelectorAll('.chip').forEach((b) =>
       b.setAttribute('aria-pressed', String(b.dataset.pref === prefijo)));
@@ -373,8 +388,7 @@
   }
 
   function buscar() {
-    const texto = el.q.value;
-    const consulta = limpio(prefijo + texto);
+    const consulta = limpio(prefijo + el.q.value);
     const out = el.resultado;
 
     if (fijado) { out.innerHTML = ficha(fijado); return; }
@@ -390,9 +404,8 @@
       .filter((p) => p.kClave !== kc && (p.kLimpio.startsWith(consulta) || p.kClave.startsWith(kc)))
       .slice(0, 40);
 
-    // Solo letras y sin prefijo elegido: buscar también por nombre
     let porNombre = [];
-    if (!prefijo && !exactos.length && !empiezan.length && consulta.length >= 3 && /[A-Z]/.test(consulta)) {
+    if (conNombres && !prefijo && !exactos.length && !empiezan.length && consulta.length >= 3 && /[A-Z]/.test(consulta)) {
       porNombre = indice.filter((p) => p.kNombre.includes(consulta)).slice(0, 40);
     }
 
@@ -423,7 +436,6 @@
   el.prefijos.addEventListener('click', (e) => {
     const b = e.target.closest('.chip'); if (!b) return;
     prefijo = prefijo === b.dataset.pref ? '' : b.dataset.pref;
-    // Si había escrito letras, quedarse solo con los números
     el.q.value = prefijo ? el.q.value.replace(/\D/g, '') : el.q.value;
     fijado = null;
     actualizarCampo(); buscar();
@@ -438,17 +450,8 @@
     window.scrollTo({ top: 0 });
   });
 
-  el.btnCargar.addEventListener('click', () => el.archivo.click());
   el.btnPegar.addEventListener('click', pegar);
   el.btnPegar2.addEventListener('click', pegar);
-  el.btnCambiar.addEventListener('click', () => el.archivo.click());
-
-  el.archivo.addEventListener('change', async () => {
-    const f = el.archivo.files && el.archivo.files[0];
-    el.archivo.value = '';
-    if (!f) return;
-    importarCualquiera(await f.text());
-  });
 
   let avisoTimer;
   function avisar(texto, esError = false) {
@@ -477,37 +480,16 @@
     if ('serviceWorker' in navigator) {
       try { await navigator.serviceWorker.register('./sw.js'); } catch {}
     }
+    if (location.search) history.replaceState(null, '', location.pathname + location.hash);
 
-    let importada = await importarDesdeHash();
+    if (await importarDesdeHash()) return;
 
-    // Archivo recibido con "Compartir" desde WhatsApp (share_target)
-    if (!importada && 'caches' in window) {
-      try {
-        const cache = await caches.open(CACHE_COMPARTIDO);
-        const resp = await cache.match(URL_COMPARTIDO);
-        if (resp) {
-          const texto = await resp.text();
-          await cache.delete(URL_COMPARTIDO);
-          const h = (k) => resp.headers.get(k) || '';
-          const detalle = h('X-Sin-Archivo')
-            ? `no llegó ningún archivo; campos: ${h('X-Sin-Archivo')}`
-            : `llegó "${decodeURIComponent(h('X-Nombre'))}", ${h('X-Tipo') || 'sin tipo'}, ${h('X-Tamano')} bytes`;
-          const muestra = texto.slice(0, 30).replace(/\s+/g, ' ');
-          importada = await importarCualquiera(texto, 'desde WhatsApp', detalle + (muestra ? `, empieza con "${muestra}"` : ''));
-        }
-      } catch {}
-    }
-    if (location.search) history.replaceState(null, '', location.pathname);
-
-    if (!importada) {
-      const guardada = leer();
-      if (guardada) { try { usarLista(validar(guardada)); } catch { el.sinLista.hidden = false; } }
-      else el.sinLista.hidden = false;
-    }
+    const guardada = leer();
+    if (valida(guardada)) usarLista(guardada);
+    else el.sinLista.hidden = false;
   }
 
   window.addEventListener('hashchange', () => { importarDesdeHash(); });
-
   arrancar();
 })();
 </script>
